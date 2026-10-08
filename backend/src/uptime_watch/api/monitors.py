@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from uptime_watch.db import get_session
 from uptime_watch.models import Monitor
-from uptime_watch.schemas import MonitorCreate, MonitorRead
+from uptime_watch.schemas import MonitorCreate, MonitorPage, MonitorRead, MonitorUpdate
 
 router = APIRouter(prefix="/api/v1/monitors", tags=["monitors"])
 
@@ -48,3 +49,41 @@ def create_monitor(body: MonitorCreate, session: SessionDep) -> Monitor:
 @router.get("/{monitor_id}", response_model=MonitorRead)
 def get_monitor(monitor_id: int, session: SessionDep) -> Monitor:
     return _get_or_404(session, monitor_id)
+
+
+@router.get("", response_model=MonitorPage)
+def list_monitors(
+    session: SessionDep,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> MonitorPage:
+    total = session.scalar(select(func.count()).select_from(Monitor)) or 0
+    monitors = session.scalars(
+        select(Monitor).order_by(Monitor.id).limit(limit).offset(offset)
+    ).all()
+    return MonitorPage(
+        items=[MonitorRead.model_validate(m) for m in monitors],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.patch("/{monitor_id}", response_model=MonitorRead)
+def update_monitor(monitor_id: int, body: MonitorUpdate, session: SessionDep) -> Monitor:
+    monitor = _get_or_404(session, monitor_id)
+    changes = body.model_dump(exclude_unset=True)
+    if "url" in changes:
+        changes["url"] = str(body.url)
+    for field, value in changes.items():
+        setattr(monitor, field, value)
+    _commit_or_409(session)
+    session.refresh(monitor)
+    return monitor
+
+
+@router.delete("/{monitor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_monitor(monitor_id: int, session: SessionDep) -> Response:
+    session.delete(_get_or_404(session, monitor_id))
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
