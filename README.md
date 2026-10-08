@@ -47,6 +47,9 @@ Requirements: Ubuntu (or WSL 2), PostgreSQL, [uv](https://docs.astral.sh/uv/).
 
 ```bash
 cd backend
+sudo -u postgres createuser --pwprompt uptime_watch          # a letters-and-digits password
+sudo -u postgres createdb -O uptime_watch uptime_watch
+sudo -u postgres createdb -O uptime_watch uptime_watch_test  # used by the tests
 cp .env.example .env        # then put your database password into .env
 uv sync                     # install the locked dependencies
 uv run alembic upgrade head # create or upgrade the database schema

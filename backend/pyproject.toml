@@ -1,7 +1,7 @@
 [project]
 name = "uptime-watch"
 version = "0.1.0"
-description = "Add your description here"
+description = "Backend for uptime-watch: API, scheduler and worker."
 readme = "README.md"
 authors = [
     { name = "polgar.donat", email = "59120493+Donuttouchme@users.noreply.github.com" }
