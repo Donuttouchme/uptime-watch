@@ -8,6 +8,10 @@ Watches a list of URLs and records whether each one is reachable and how fast it
 A URL registered for regular checking, together with how often to check it.
 _Avoid_: target, site, endpoint
 
+**Paused**:
+A monitor that is kept but not checked until it is resumed.
+_Avoid_: disabled, inactive, stopped
+
 **Check**:
 One attempt to reach a monitor's URL.
 _Avoid_: ping, probe, test
