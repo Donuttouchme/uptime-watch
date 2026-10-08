@@ -6,6 +6,7 @@ from alembic import command
 from alembic.config import Config
 from dotenv import dotenv_values
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from uptime_watch.db import escape_for_alembic
@@ -19,6 +20,13 @@ def _test_database_url() -> str:
     )
     if not url:
         pytest.exit("TEST_DATABASE_URL is not set: add it to backend/.env", returncode=1)
+    # The engine fixture runs `downgrade base`, which drops every table.
+    database = make_url(url).database or ""
+    if not database.endswith("_test"):
+        pytest.exit(
+            f"TEST_DATABASE_URL must point to a database whose name ends in _test, got {database!r}",
+            returncode=1,
+        )
     return url
 
 
