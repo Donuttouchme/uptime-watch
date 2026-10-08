@@ -44,3 +44,19 @@ def session(engine):
         connection.execute(text("TRUNCATE monitors RESTART IDENTITY"))
     with Session(engine) as session:
         yield session
+
+
+@pytest.fixture
+def client(session):
+    from fastapi.testclient import TestClient
+
+    from uptime_watch.api.app import app
+    from uptime_watch.db import get_session
+
+    def _session_override():
+        yield session
+
+    app.dependency_overrides[get_session] = _session_override
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
