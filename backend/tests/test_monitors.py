@@ -167,3 +167,36 @@ def test_out_of_range_id_returns_404(client, monitor_id):
     assert client.get(url).status_code == 404
     assert client.patch(url, json={"name": "x"}).status_code == 404
     assert client.delete(url).status_code == 404
+
+
+def test_create_rejects_url_too_long_after_normalisation(client):
+    # Under 2083 characters as typed, about 6000 once the e-acutes are percent-encoded.
+    assert create(client, url="https://example.com/" + "é" * 1000).status_code == 422
+
+
+def test_update_rejects_url_too_long_after_normalisation(client):
+    created = create(client).json()
+
+    response = client.patch(
+        f"{MONITORS}/{created['id']}", json={"url": "https://example.com/" + "é" * 1000}
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_rejects_control_characters_in_name(client):
+    assert create(client, name="a\x00b").status_code == 422
+    assert create(client, name="a\nb").status_code == 422
+
+
+def test_list_rejects_offset_beyond_integer_range(client):
+    assert client.get(MONITORS, params={"offset": 2_147_483_648}).status_code == 422
+
+
+def test_list_rejects_negative_offset(client):
+    assert client.get(MONITORS, params={"offset": -1}).status_code == 422
+
+
+def test_create_accepts_interval_of_one_day_and_rejects_more(client):
+    assert create(client, interval_seconds=86_400).status_code == 201
+    assert create(client, url="https://example.org", interval_seconds=86_401).status_code == 422

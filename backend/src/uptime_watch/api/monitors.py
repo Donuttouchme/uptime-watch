@@ -58,7 +58,7 @@ def get_monitor(monitor_id: int, session: SessionDep) -> Monitor:
 def list_monitors(
     session: SessionDep,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Annotated[int, Query(ge=0, le=MAX_ID)] = 0,
 ) -> MonitorPage:
     total = session.scalar(select(func.count()).select_from(Monitor)) or 0
     monitors = session.scalars(

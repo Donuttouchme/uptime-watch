@@ -1,16 +1,31 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
 MIN_INTERVAL_SECONDS = 30
 MAX_INTERVAL_SECONDS = 86_400
+MAX_URL_LENGTH = 2083
+# Postgres text cannot hold NUL, and control characters in a name help nobody.
+NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f]*$"
+
+
+def _check_url_length(url: HttpUrl) -> HttpUrl:
+    # Measured after normalisation: percent-encoding can make a URL several times longer
+    # than it was typed, and the column is sized for the normalised form.
+    if len(str(url)) > MAX_URL_LENGTH:
+        raise ValueError(f"url must be at most {MAX_URL_LENGTH} characters once normalised")
+    return url
+
+
+MonitorUrl = Annotated[HttpUrl, AfterValidator(_check_url_length)]
 
 
 class MonitorCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=100, pattern=NO_CONTROL_CHARACTERS)
     # HttpUrl accepts only http/https and normalises host case and the bare-host slash,
     # so "https://Example.com" and "https://example.com/" are the same monitor.
-    url: HttpUrl
+    url: MonitorUrl
     interval_seconds: int = Field(default=60, ge=MIN_INTERVAL_SECONDS, le=MAX_INTERVAL_SECONDS)
     paused: bool = False
 
@@ -27,8 +42,10 @@ class MonitorRead(BaseModel):
 
 
 class MonitorUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
-    url: HttpUrl | None = None
+    name: str | None = Field(
+        default=None, min_length=1, max_length=100, pattern=NO_CONTROL_CHARACTERS
+    )
+    url: MonitorUrl | None = None
     interval_seconds: int | None = Field(
         default=None, ge=MIN_INTERVAL_SECONDS, le=MAX_INTERVAL_SECONDS
     )
