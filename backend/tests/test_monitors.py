@@ -200,3 +200,15 @@ def test_list_rejects_negative_offset(client):
 def test_create_accepts_interval_of_one_day_and_rejects_more(client):
     assert create(client, interval_seconds=86_400).status_code == 201
     assert create(client, url="https://example.org", interval_seconds=86_401).status_code == 422
+
+
+def test_create_rejects_blank_name(client):
+    assert create(client, name="   ").status_code == 422
+
+
+def test_patch_rejects_unknown_field(client):
+    created = create(client).json()
+
+    response = client.patch(f"{MONITORS}/{created['id']}", json={"pause": True})
+
+    assert response.status_code == 422

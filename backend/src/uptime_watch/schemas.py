@@ -1,7 +1,15 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    StringConstraints,
+    model_validator,
+)
 
 MIN_INTERVAL_SECONDS = 30
 MAX_INTERVAL_SECONDS = 86_400
@@ -19,10 +27,20 @@ def _check_url_length(url: HttpUrl) -> HttpUrl:
 
 
 MonitorUrl = Annotated[HttpUrl, AfterValidator(_check_url_length)]
+# Stripped first, so a name of only spaces counts as empty.
+MonitorName = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=100, pattern=NO_CONTROL_CHARACTERS
+    ),
+]
 
 
 class MonitorCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100, pattern=NO_CONTROL_CHARACTERS)
+    # A typo such as "pause" must be an error, not a silently ignored field.
+    model_config = ConfigDict(extra="forbid")
+
+    name: MonitorName
     # HttpUrl accepts only http/https and normalises host case and the bare-host slash,
     # so "https://Example.com" and "https://example.com/" are the same monitor.
     url: MonitorUrl
@@ -42,9 +60,9 @@ class MonitorRead(BaseModel):
 
 
 class MonitorUpdate(BaseModel):
-    name: str | None = Field(
-        default=None, min_length=1, max_length=100, pattern=NO_CONTROL_CHARACTERS
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    name: MonitorName | None = None
     url: MonitorUrl | None = None
     interval_seconds: int | None = Field(
         default=None, ge=MIN_INTERVAL_SECONDS, le=MAX_INTERVAL_SECONDS
