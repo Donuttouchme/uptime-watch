@@ -13,9 +13,12 @@ router = APIRouter(prefix="/api/v1/monitors", tags=["monitors"])
 
 SessionDep = Annotated[Session, Depends(get_session)]
 
+# The id is a Postgres INTEGER; anything outside it cannot exist and would be a DataError.
+MAX_ID = 2_147_483_647
+
 
 def _get_or_404(session: Session, monitor_id: int) -> Monitor:
-    monitor = session.get(Monitor, monitor_id)
+    monitor = session.get(Monitor, monitor_id) if 1 <= monitor_id <= MAX_ID else None
     if monitor is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Monitor not found")
     return monitor

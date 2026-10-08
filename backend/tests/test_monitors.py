@@ -1,3 +1,5 @@
+import pytest
+
 MONITORS = "/api/v1/monitors"
 
 
@@ -156,3 +158,12 @@ def test_delete_removes_monitor(client):
 
 def test_delete_unknown_monitor_returns_404(client):
     assert client.delete(f"{MONITORS}/999").status_code == 404
+
+
+@pytest.mark.parametrize("monitor_id", [2_147_483_648, 10**30])
+def test_out_of_range_id_returns_404(client, monitor_id):
+    url = f"{MONITORS}/{monitor_id}"
+
+    assert client.get(url).status_code == 404
+    assert client.patch(url, json={"name": "x"}).status_code == 404
+    assert client.delete(url).status_code == 404
