@@ -41,6 +41,22 @@ Design decisions are recorded in [`docs/adr/`](docs/adr/), and the project's voc
 | Monitoring (Prometheus, Grafana, Alertmanager) | planned |
 | GitOps | planned |
 
+## Run locally
+
+Requirements: Ubuntu (or WSL 2), PostgreSQL, [uv](https://docs.astral.sh/uv/).
+
+```bash
+cd backend
+cp .env.example .env        # then put your database password into .env
+uv sync                     # install the locked dependencies
+uv run alembic upgrade head # create or upgrade the database schema
+uv run uvicorn uptime_watch.api.app:app --reload
+```
+
+- Health: http://localhost:8000/health
+- Interactive API docs: http://localhost:8000/docs
+- Tests: `uv run pytest`
+
 ## Status
 
-Week 0: repository set up; the app skeleton is next.
+Week 0: the API runs locally. Monitors can be created, listed, updated and deleted; the checks themselves come next.
