@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
     func,
@@ -21,6 +22,7 @@ class Monitor(Base):
         UniqueConstraint("url", name="uq_monitors_url"),
         CheckConstraint("interval_seconds BETWEEN 30 AND 86400", name="ck_monitors_interval_range"),
         CheckConstraint("char_length(name) >= 1", name="ck_monitors_name_not_empty"),
+        Index("ix_monitors_next_check_at", "next_check_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -40,6 +42,7 @@ class Monitor(Base):
 class Result(Base):
     __tablename__ = "results"
     __table_args__ = (
+        Index("ix_results_monitor_id_checked_at", "monitor_id", text("checked_at DESC")),
         CheckConstraint("status_code BETWEEN 100 AND 599", name="ck_results_status_code_range"),
         CheckConstraint("response_time_ms >= 0", name="ck_results_response_time_not_negative"),
     )
