@@ -37,6 +37,11 @@ def enqueue_due(session: Session, queue: Queue) -> list[int]:
 
     The UPDATE and the queueing share one transaction: if Redis fails, the
     UPDATE rolls back and the monitors are still due on the next tick.
+
+    Delivery is at-least-once, not exactly-once. If Redis fails part-way, or the
+    commit fails after the enqueues, the jobs already queued stay queued while the
+    UPDATE rolls back, so those monitors are queued again next tick. The job TTL
+    (one interval) bounds the extra to one check per monitor.
     """
     try:
         rows = session.execute(_TAKE_DUE).all()
@@ -57,7 +62,13 @@ def enqueue_due(session: Session, queue: Queue) -> list[int]:
 
 
 def try_acquire_lock(connection: Connection) -> bool:
-    """Take the scheduler lock on this connection; it lasts as long as the connection."""
+    """Take the scheduler lock on this connection.
+
+    The lock is session-level: it lasts as long as the database session. With a
+    pooled engine, closing the Connection only returns the session to the pool and
+    does not end it, so the caller must invalidate() the connection to release the
+    lock (as run() does).
+    """
     return bool(
         connection.execute(
             text("SELECT pg_try_advisory_lock(:key)"), {"key": SCHEDULER_LOCK_KEY}
