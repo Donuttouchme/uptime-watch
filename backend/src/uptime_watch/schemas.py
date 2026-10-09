@@ -4,6 +4,7 @@ from typing import Annotated
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     HttpUrl,
@@ -18,6 +19,13 @@ MAX_URL_LENGTH = 2083
 NO_CONTROL_CHARACTERS = r"^[^\x00-\x1f\x7f]*$"
 
 
+def _strip_fragment(value: object) -> object:
+    # The fragment (#...) never reaches the server, so it cannot make two monitors different.
+    if isinstance(value, str):
+        return value.split("#", 1)[0]
+    return value
+
+
 def _check_url_length(url: HttpUrl) -> HttpUrl:
     # Measured after normalisation: percent-encoding can make a URL several times longer
     # than it was typed, and the column is sized for the normalised form.
@@ -26,7 +34,9 @@ def _check_url_length(url: HttpUrl) -> HttpUrl:
     return url
 
 
-MonitorUrl = Annotated[HttpUrl, AfterValidator(_check_url_length)]
+MonitorUrl = Annotated[
+    HttpUrl, BeforeValidator(_strip_fragment), AfterValidator(_check_url_length)
+]
 # Stripped first, so a name of only spaces counts as empty.
 MonitorName = Annotated[
     str,
@@ -57,6 +67,7 @@ class MonitorRead(BaseModel):
     interval_seconds: int
     paused: bool
     created_at: datetime
+    next_check_at: datetime
 
 
 class MonitorUpdate(BaseModel):
@@ -81,6 +92,25 @@ class MonitorUpdate(BaseModel):
 
 class MonitorPage(BaseModel):
     items: list[MonitorRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class ResultRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    monitor_id: int
+    checked_at: datetime
+    up: bool
+    status_code: int | None
+    response_time_ms: int | None
+    error: str | None
+
+
+class ResultPage(BaseModel):
+    items: list[ResultRead]
     total: int
     limit: int
     offset: int

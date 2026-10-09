@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 MONITORS = "/api/v1/monitors"
@@ -210,5 +212,83 @@ def test_patch_rejects_unknown_field(client):
     created = create(client).json()
 
     response = client.patch(f"{MONITORS}/{created['id']}", json={"pause": True})
+
+    assert response.status_code == 422
+
+
+def when(body, field="next_check_at"):
+    return datetime.fromisoformat(body[field])
+
+
+def test_create_strips_url_fragment(client):
+    response = create(client, url="https://example.com/#pricing")
+
+    assert response.status_code == 201
+    assert response.json()["url"] == "https://example.com/"
+
+
+def test_urls_differing_only_by_fragment_are_the_same_monitor(client):
+    create(client, url="https://example.com/#a")
+
+    assert create(client, url="https://example.com/#b", name="Again").status_code == 409
+
+
+def test_patch_strips_url_fragment(client):
+    created = create(client).json()
+
+    response = client.patch(f"{MONITORS}/{created['id']}", json={"url": "https://example.org/x#y"})
+
+    assert response.json()["url"] == "https://example.org/x"
+
+
+def test_new_monitor_is_due_at_once(client):
+    body = create(client).json()
+
+    assert when(body) <= datetime.now(UTC)
+
+
+def test_changing_the_interval_moves_the_next_check(client):
+    created = create(client).json()
+
+    body = client.patch(f"{MONITORS}/{created['id']}", json={"interval_seconds": 600}).json()
+
+    assert when(body) >= datetime.now(UTC) + timedelta(seconds=590)
+
+
+def test_sending_the_same_interval_keeps_the_next_check(client):
+    created = create(client).json()
+
+    body = client.patch(f"{MONITORS}/{created['id']}", json={"interval_seconds": 60}).json()
+
+    assert body["next_check_at"] == created["next_check_at"]
+
+
+def test_resuming_makes_the_monitor_due_at_once(client):
+    created = create(client).json()
+    path = f"{MONITORS}/{created['id']}"
+    client.patch(path, json={"interval_seconds": 600})
+    client.patch(path, json={"paused": True})
+
+    body = client.patch(path, json={"paused": False}).json()
+
+    assert when(body) <= datetime.now(UTC)
+
+
+def test_resuming_and_changing_the_interval_together_is_due_at_once(client):
+    created = create(client, paused=True).json()
+
+    body = client.patch(
+        f"{MONITORS}/{created['id']}", json={"paused": False, "interval_seconds": 600}
+    ).json()
+
+    assert when(body) <= datetime.now(UTC)
+
+
+def test_client_cannot_set_the_next_check(client):
+    created = create(client).json()
+
+    response = client.patch(
+        f"{MONITORS}/{created['id']}", json={"next_check_at": "2030-01-01T00:00:00Z"}
+    )
 
     assert response.status_code == 422
