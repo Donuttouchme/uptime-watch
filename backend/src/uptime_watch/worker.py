@@ -22,8 +22,13 @@ def check_and_record(session: Session, client: httpx2.Client, monitor_id: int) -
         # Deleted or paused while the job waited on the queue (ADR 0005).
         return None
 
+    url = monitor.url
+    # End the transaction session.get() opened: it must not sit idle (holding a lock
+    # on monitors and a pooled connection) for the whole HTTP check.
+    session.rollback()
+
     checked_at = datetime.now(UTC)
-    outcome = check_url(client, monitor.url)
+    outcome = check_url(client, url)
     result = Result(
         monitor_id=monitor_id,
         checked_at=checked_at,
