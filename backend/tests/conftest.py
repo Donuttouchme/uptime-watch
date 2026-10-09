@@ -49,7 +49,7 @@ def engine():
 @pytest.fixture
 def session(engine):
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE monitors RESTART IDENTITY"))
+        connection.execute(text("TRUNCATE monitors, results RESTART IDENTITY"))
     with Session(engine) as session:
         yield session
 
