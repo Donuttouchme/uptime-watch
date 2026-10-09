@@ -51,6 +51,19 @@ def test_timeout_is_down_without_status():
     assert outcome.error == "timeout"
 
 
+def test_headers_arriving_after_the_total_timeout_are_a_timeout(monkeypatch):
+    # httpx2 times each phase separately; the check as a whole must still fit the timeout.
+    readings = [1000.0]  # the check's start; every later reading is 11 s on
+    monkeypatch.setattr(
+        "uptime_watch.checks.time.perf_counter", lambda: readings.pop() if readings else 1011.0
+    )
+
+    outcome = check_url(client_answering(lambda request: httpx2.Response(200)), URL)
+
+    assert (outcome.up, outcome.status_code, outcome.response_time_ms) == (False, None, None)
+    assert outcome.error == "timeout"
+
+
 def test_dns_failure_is_named():
     def handler(request):
         raise httpx2.ConnectError("[Errno -2] Name or service not known", request=request)

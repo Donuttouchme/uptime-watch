@@ -41,12 +41,19 @@ def check_url(client: httpx2.Client, url: str) -> CheckOutcome:
         # stream() returns once the headers are in; leaving the block closes the
         # connection without reading the body, so the response time ends at the headers.
         with client.stream("GET", url) as response:
-            elapsed_ms = round((time.perf_counter() - start) * 1000)
+            elapsed = time.perf_counter() - start
             status = response.status_code
     except httpx2.TimeoutException:
         return _down("timeout")
     except httpx2.HTTPError as exc:
         return _down(_describe(exc))
+
+    # httpx2 limits each phase on its own, so the total is checked here. make_client
+    # sets one value for every phase, so read is the configured timeout.
+    timeout = client.timeout.read
+    if timeout is not None and elapsed > timeout:
+        return _down("timeout")
+    elapsed_ms = round(elapsed * 1000)
 
     if not 100 <= status <= 599:
         return _down(f"invalid status code {status}")
