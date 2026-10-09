@@ -43,23 +43,32 @@ Design decisions are recorded in [`docs/adr/`](docs/adr/), and the project's voc
 
 ## Run locally
 
-Requirements: Ubuntu (or WSL 2), PostgreSQL, [uv](https://docs.astral.sh/uv/).
+Requirements: Ubuntu (or WSL 2), PostgreSQL, Redis, [uv](https://docs.astral.sh/uv/).
 
 ```bash
 cd backend
 sudo -u postgres createuser --pwprompt uptime_watch          # a letters-and-digits password
 sudo -u postgres createdb -O uptime_watch uptime_watch
 sudo -u postgres createdb -O uptime_watch uptime_watch_test  # used by the tests
+sudo apt install redis-server                                # listens on 127.0.0.1:6379
 cp .env.example .env        # then put your database password into .env
 uv sync                     # install the locked dependencies
 uv run alembic upgrade head # create or upgrade the database schema
-uv run uvicorn uptime_watch.api.app:app --reload
+```
+
+Then start the three processes, each in its own terminal (from `backend/`):
+
+```bash
+uv run uvicorn uptime_watch.api.app:app --reload   # api
+uv run uptime-watch-scheduler                       # exactly one copy
+uv run uptime-watch-worker                          # one or more copies
 ```
 
 - Health: http://localhost:8000/health
 - Interactive API docs: http://localhost:8000/docs
-- Tests: `uv run pytest`
+- A monitor's results: `GET /api/v1/monitors/{id}/results`
+- Tests: `uv run pytest` (needs Postgres and Redis running; uses the `_test` database and Redis database 15)
 
 ## Status
 
-Week 0: the API runs locally. Monitors can be created, listed, updated and deleted; the checks themselves come next.
+Week 0: the app runs locally. Monitors are checked on their interval by a scheduler, a Redis queue and workers, and the results are served by the API.
