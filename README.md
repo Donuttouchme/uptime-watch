@@ -24,6 +24,12 @@ This is my DevOps learning capstone. The app is deliberately small; the point is
 - **web**: React + Vite + TypeScript frontend.
 - **PostgreSQL** stores monitors and results; **Redis** is the job queue.
 
+### How a check travels
+
+1. Every 5 seconds (`SCHEDULER_TICK_SECONDS`) the **scheduler** asks Postgres which monitors are due, moves each one's `next_check_at` one interval ahead, and pushes a job onto the Redis list `rq:queue:checks`. The list holds only the job ID; the details sit in a hash `rq:job:<id>` that expires after one interval, because a check that waited longer is stale and a newer one is already queued.
+2. A **worker** moves the ID to `rq:queue:checks:intermediate` (so a crash mid-check doesn't lose it), runs the HTTP GET, and writes the result to **Postgres**. IDs whose hash has expired are dropped without a log line.
+3. The **api** reads monitors and results from Postgres only; it never talks to Redis. With Redis down, the API still answers and checks simply pause; with Postgres down, every part fails.
+
 Design decisions are recorded in [`docs/adr/`](docs/adr/), and the project's vocabulary is in [`CONTEXT.md`](CONTEXT.md).
 
 ## Planned layers
